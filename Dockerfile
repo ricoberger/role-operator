@@ -1,0 +1,19 @@
+FROM golang:1.26.5 AS builder
+WORKDIR /workspace
+
+COPY go.mod go.mod
+COPY go.sum go.sum
+RUN go mod download
+
+COPY cmd/main.go cmd/main.go
+COPY api/ api/
+COPY internal/controller/ internal/controller/
+COPY internal/ internal/
+
+RUN CGO_ENABLED=0 go build -a -o manager cmd/main.go
+
+FROM alpine:3.24.1
+WORKDIR /
+COPY --from=builder /workspace/manager .
+USER nobody
+ENTRYPOINT ["/manager"]
