@@ -1,0 +1,6 @@
+You can find more information about running the Role Operator on Kubernetes
+in the GitHub repository:
+
+  https://github.com/ricoberger/role-operator
+
+Thanks for using the Role Operator!

@@ -1,0 +1,7 @@
+---
+apiVersion: v2
+name: role-operator
+description: Deploy the Role Operator to manage roles in your cluster
+type: application
+version: 1.0.0
+appVersion: v0.1.0
