@@ -1,135 +1,113 @@
-# role-operator
-// TODO(user): Add simple overview of use/purpose
+# Role Operator
 
-## Description
-// TODO(user): An in-depth paragraph about your project and overview of use
+The Role Operator can be used to create Roles, RoleBindings, ClusterRoles and
+ClusterRoleBindings for a subject. This is useful to manage permissions for a
+group or user, where the permissions are defined in a single Role resource and
+applied to multiple namespaces.
 
-## Getting Started
+## Installation
 
-### Prerequisites
-- go version v1.24.0+
-- docker version 17.03+.
-- kubectl version v1.11.3+.
-- Access to a Kubernetes v1.11.3+ cluster.
-
-### To Deploy on the cluster
-**Build and push your image to the location specified by `IMG`:**
+The Role Operator can be installed via Helm:
 
 ```sh
-make docker-build docker-push IMG=<some-registry>/role-operator:tag
+helm upgrade --install role-operator oci://ghcr.io/ricoberger/charts/role-operator --version <VERSION>
 ```
 
-**NOTE:** This image ought to be published in the personal registry you specified.
-And it is required to have access to pull the image from the working environment.
-Make sure you have the proper permission to the registry if the above commands don’t work.
+## API Reference
 
-**Install the CRDs into the cluster:**
+### Role
+
+```yaml
+apiVersion: ricoberger.de/v1alpha1
+kind: Role
+metadata:
+  name:
+  namespace:
+spec:
+  # A list of subjects (users, groups, or service accounts) that will be granted
+  # the permissions defined in the `roleRules` and `clusterRoleRules`.
+  subjects:
+  # A list of namespaces where Roles and RoleBindings will be created, with the
+  # permissions defined in the `roleRules`.
+  namespaces:
+  # A list of rules to be applied to Roles created in the namespaces defined in
+  # the `namespaces`.
+  roleRules:
+  # A list of rules to be applied to the ClusterRole created.
+  clusterRoleRules:
+```
+
+<details>
+<summary>Example</summary>
+
+```yaml
+apiVersion: ricoberger.de/v1alpha1
+kind: Role
+metadata:
+  name: mygroup
+  namespace: default
+spec:
+  subjects:
+    - kind: Group
+      name: mygroup
+      apiGroup: rbac.authorization.k8s.io
+  namespaces:
+    - default
+    - kube-system
+  roleRules:
+    - apiGroups:
+        - "*"
+      resources:
+        - "*"
+      verbs:
+        - get
+        - list
+        - watch
+        - create
+        - update
+        - patch
+        - delete
+  clusterRoleRules:
+    - apiGroups:
+        - "*"
+      resources:
+        - "*"
+      verbs:
+        - get
+        - list
+        - watch
+```
+
+</details>
+
+## Development
+
+After modifying the `*_types.go` file always run the following command to update
+the generated code for that resource type:
 
 ```sh
-make install
+make generate
 ```
 
-**Deploy the Manager to the cluster with the image specified by `IMG`:**
+The above Makefile target will invoke the
+[controller-gen](https://sigs.k8s.io/controller-tools) utility to update the
+`api/v1alpha1/zz_generated.deepcopy.go` file to ensure our API's Go type
+definitons implement the `runtime.Object` interface that all Kind types must
+implement.
+
+Once the API is defined with spec/status fields and CRD validation markers, the
+CRD manifests can be generated and updated with the following command:
 
 ```sh
-make deploy IMG=<some-registry>/role-operator:tag
+make manifests
 ```
 
-> **NOTE**: If you encounter RBAC errors, you may need to grant yourself cluster-admin
-privileges or be logged in as admin.
+This Makefile target will invoke controller-gen to generate the CRD manifests at
+`charts/role-operator/crds/ricoberger.de_roles.yaml`.
 
-**Create instances of your solution**
-You can apply the samples (examples) from the config/sample:
+Deploy the CRD and run the operator locally with the default Kubernetes config
+file present at `$HOME/.kube/config`:
 
 ```sh
-kubectl apply -k config/samples/
+make run
 ```
-
->**NOTE**: Ensure that the samples has default values to test it out.
-
-### To Uninstall
-**Delete the instances (CRs) from the cluster:**
-
-```sh
-kubectl delete -k config/samples/
-```
-
-**Delete the APIs(CRDs) from the cluster:**
-
-```sh
-make uninstall
-```
-
-**UnDeploy the controller from the cluster:**
-
-```sh
-make undeploy
-```
-
-## Project Distribution
-
-Following the options to release and provide this solution to the users.
-
-### By providing a bundle with all YAML files
-
-1. Build the installer for the image built and published in the registry:
-
-```sh
-make build-installer IMG=<some-registry>/role-operator:tag
-```
-
-**NOTE:** The makefile target mentioned above generates an 'install.yaml'
-file in the dist directory. This file contains all the resources built
-with Kustomize, which are necessary to install this project without its
-dependencies.
-
-2. Using the installer
-
-Users can just run 'kubectl apply -f <URL for YAML BUNDLE>' to install
-the project, i.e.:
-
-```sh
-kubectl apply -f https://raw.githubusercontent.com/<org>/role-operator/<tag or branch>/dist/install.yaml
-```
-
-### By providing a Helm Chart
-
-1. Build the chart using the optional helm plugin
-
-```sh
-operator-sdk edit --plugins=helm/v1-alpha
-```
-
-2. See that a chart was generated under 'dist/chart', and users
-can obtain this solution from there.
-
-**NOTE:** If you change the project, you need to update the Helm Chart
-using the same command above to sync the latest changes. Furthermore,
-if you create webhooks, you need to use the above command with
-the '--force' flag and manually ensure that any custom configuration
-previously added to 'dist/chart/values.yaml' or 'dist/chart/manager/manager.yaml'
-is manually re-applied afterwards.
-
-## Contributing
-// TODO(user): Add detailed information on how you would like others to contribute to this project
-
-**NOTE:** Run `make help` for more information on all potential `make` targets
-
-More information can be found via the [Kubebuilder Documentation](https://book.kubebuilder.io/introduction.html)
-
-## License
-
-Copyright 2026.
-
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
-
-    http://www.apache.org/licenses/LICENSE-2.0
-
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
-

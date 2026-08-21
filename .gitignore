@@ -26,5 +26,7 @@ go.work
 *.swo
 *~
 
-# Config
+# Config, example role and Kubeconfig
 config
+role.yaml
+kubeconfig.yaml
