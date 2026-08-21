@@ -27,6 +27,6 @@ go.work
 *~
 
 # Config, example role and Kubeconfig
-config
+/config
 role.yaml
 kubeconfig.yaml

@@ -25,6 +25,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	ricobergerdev1alpha1 "github.com/ricoberger/role-operator/api/v1alpha1"
+	"github.com/ricoberger/role-operator/internal/config"
 )
 
 // RoleReconciler reconciles a Role object
@@ -54,6 +55,21 @@ func (r *RoleReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.
 		// The Role was deleted, owner references take care of garbage
 		// collecting the managed objects.
 		return ctrl.Result{}, client.IgnoreNotFound(err)
+	}
+
+	// Resolve the preset referenced in the spec and merge its namespaces and
+	// rules into the effective Role. When the preset can not be found we fail
+	// closed: we do not modify any objects and we do not requeue, because a
+	// requeue can not fix a missing preset. All following logic operates on the
+	// merged Role.
+	role, err := r.mergePreset(role)
+	if err != nil {
+		log.Error(err, "failed to resolve preset")
+		if updateReadyConditionErr := r.updateReadyCondition(ctx, role, metav1.ConditionFalse, "PresetNotFound", err.Error()); updateReadyConditionErr != nil {
+			log.Error(updateReadyConditionErr, "failed to update Ready condition")
+			return ctrl.Result{}, updateReadyConditionErr
+		}
+		return ctrl.Result{}, nil
 	}
 
 	// A Role without subjects grants nothing, therefore we treat an empty list
@@ -93,6 +109,29 @@ func (r *RoleReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.
 	}
 
 	return ctrl.Result{}, nil
+}
+
+// mergePreset returns a copy of the given Role with the namespaces and rules of
+// the referenced preset appended to the ones defined in the spec. When the spec
+// does not reference a preset the Role is returned unchanged. When the
+// referenced preset can not be found an error is returned and no objects should
+// be modified.
+func (r *RoleReconciler) mergePreset(role *ricobergerdev1alpha1.Role) (*ricobergerdev1alpha1.Role, error) {
+	if role.Spec.Preset == "" {
+		return role, nil
+	}
+
+	preset := config.GetPreset(role.Spec.Preset)
+	if preset == nil {
+		return role, fmt.Errorf("preset %s not found", role.Spec.Preset)
+	}
+
+	merged := role.DeepCopy()
+	merged.Spec.Namespaces = append(merged.Spec.Namespaces, preset.Namespaces...)
+	merged.Spec.RoleRules = append(merged.Spec.RoleRules, preset.RoleRules...)
+	merged.Spec.ClusterRoleRules = append(merged.Spec.ClusterRoleRules, preset.ClusterRoleRules...)
+
+	return merged, nil
 }
 
 // reconcile applies the desired state for all managed objects and prunes the

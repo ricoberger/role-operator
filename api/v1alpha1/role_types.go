@@ -7,6 +7,11 @@ import (
 
 // RoleSpec defines the desired state of Role.
 type RoleSpec struct {
+	// The name of a preset defined in the configuration file of the operator.
+	// The `namespaces`, `roleRules` and `clusterRoleRules` from the preset will
+	// be appended to the `namespaces`, `roleRules` and `clusterRoleRules`
+	// defined in the Role resource.
+	Preset string `json:"preset,omitempty"`
 	// A list of subjects (users, groups, or service accounts) that will be
 	// granted the permissions defined in the `roleRules` and
 	// `clusterRoleRules`.

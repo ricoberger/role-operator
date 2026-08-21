@@ -117,6 +117,13 @@ spec:
                 items:
                   type: string
                 type: array
+              preset:
+                description: |-
+                  The name of a preset defined in the configuration file of the operator.
+                  The `namespaces`, `roleRules` and `clusterRoleRules` from the preset will
+                  be appended to the `namespaces`, `roleRules` and `clusterRoleRules`
+                  defined in the Role resource.
+                type: string
               roleRules:
                 description: |-
                   A list of rules to be applied to Roles created in the namespaces defined
