@@ -22,6 +22,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 
 	ricobergerdev1alpha1 "github.com/ricoberger/role-operator/api/v1alpha1"
+	"github.com/ricoberger/role-operator/internal/config"
 	"github.com/ricoberger/role-operator/internal/controller"
 	// +kubebuilder:scaffold:imports
 )
@@ -68,6 +69,11 @@ func main() {
 	flag.Parse()
 
 	ctrl.SetLogger(zap.New(zap.UseFlagOptions(&opts)))
+
+	if err := config.Init(); err != nil {
+		setupLog.Error(err, "failed to initialize configuration")
+		os.Exit(1)
+	}
 
 	// if the enable-http2 flag is false (the default), http/2 should be
 	// disabled due to its vulnerabilities. More specifically, disabling http/2
