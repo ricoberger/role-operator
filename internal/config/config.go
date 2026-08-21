@@ -4,6 +4,7 @@ import (
 	"os"
 
 	rbacv1 "k8s.io/api/rbac/v1"
+	"sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/yaml"
 )
 
@@ -32,6 +33,8 @@ func Init() error {
 		if err != nil {
 			return err
 		}
+
+		log.Log.Info("loaded configuration", "file", configFile, "presets", len(config.Presets))
 	}
 
 	return nil
