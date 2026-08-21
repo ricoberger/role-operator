@@ -1,0 +1,162 @@
+nameOverride: ""
+fullnameOverride: ""
+
+## Set the image which should be used for the Role Operator. If the 'tag' is not
+## set the chart app version is used.
+##
+image:
+  repository: ghcr.io/ricoberger/role-operator
+  pullPolicy: IfNotPresent
+  tag: ""
+
+## Specify a list of image pull secrets, to avoid the DockerHub rate limit or to
+## pull the ghcr.io/ricoberger/role-operator image from a private registry.
+## See: https://kubernetes.io/docs/tasks/configure-pod-container/pull-image-private-registry/
+##
+imagePullSecrets:
+  []
+  # - name: regcred
+
+## The number of Pods, which are created by the Deployment.
+## See: https://kubernetes.io/docs/concepts/workloads/controllers/deployment/
+##
+replicaCount: 1
+
+## Specify security settings for the created Pods. To set the security settings
+## for the role-operator container use the corresponding "securityContext"
+## field.
+## See: https://kubernetes.io/docs/tasks/configure-pod-container/security-context/#set-the-security-context-for-a-pod
+##
+podSecurityContext:
+  {}
+  # fsGroup: 2000
+
+## Specify security settings for the Container. They override settings made at
+## the Pod level via the "podSecurityContext" when there is overlap.
+## See: https://kubernetes.io/docs/tasks/configure-pod-container/security-context/#set-the-security-context-for-a-container
+##
+securityContext:
+  {}
+  # capabilities:
+  #   drop:
+  #   - ALL
+  # readOnlyRootFilesystem: true
+  # runAsNonRoot: true
+  # runAsUser: 1000
+
+## We usually recommend not to specify default resources and to leave this as a
+## conscious choice for the user. This also increases chances charts run on
+## environments with little resources, such as Minikube. If you do want to
+## specify resources, uncomment the following lines, adjust them as necessary,
+## and remove the curly braces after 'resources:'.
+##
+resources:
+  {}
+  # limits:
+  #   cpu: 100m
+  #   memory: 128Mi
+  # requests:
+  #   cpu: 100m
+  #   memory: 128Mi
+
+## Specify a map of key-value pairs, to assign the Pods to a specific set of
+## nodes.
+## See: https://kubernetes.io/docs/concepts/scheduling-eviction/assign-pod-node/#nodeselector
+##
+nodeSelector: {}
+
+## Specify the tolerations for the Pods.
+## See: https://kubernetes.io/docs/concepts/scheduling-eviction/taint-and-toleration/
+##
+tolerations: []
+
+## Specify a node affinity or inter-pod affinity / anti-affinity for an advanced
+## scheduling of the Pods.
+## See: https://kubernetes.io/docs/concepts/scheduling-eviction/assign-pod-node/#affinity-and-anti-affinity
+##
+affinity: {}
+
+## Topology spread constraints rely on node labels to identify the topology
+## domain(s) that each Node is in.
+## See: https://kubernetes.io/docs/concepts/workloads/pods/pod-topology-spread-constraints/
+##
+topologySpreadConstraints:
+  []
+  # - maxSkew: 1
+  #   topologyKey: topology.kubernetes.io/zone
+  #   whenUnsatisfiable: DoNotSchedule
+  #   labelSelector:
+  #     matchLabels:
+  #       app.kubernetes.io/name: role-operator
+
+## Specify additional volumes for the Deployment.
+## See: https://kubernetes.io/docs/concepts/storage/volumes/
+##
+volumes:
+  []
+  ## For example this can be used to mount an existing Role configration which
+  ## is used as the source configuration for the Role Operator.
+  ##
+  # - name: role
+  #   configMap:
+  #     name: role
+
+## Specify additional volumeMounts for the container.
+## See: https://kubernetes.io/docs/concepts/storage/volumes/
+##
+volumeMounts:
+  []
+  # - name: role
+  #   mountPath: /etc/role
+
+## Specify additional arguments for the container.
+## See: https://kubernetes.io/docs/tasks/inject-data-application/define-command-argument-container/
+##
+args:
+  - --leader-elect
+  - --metrics-bind-address=:8080
+  - --metrics-secure=false
+  # - -zap-encoder json
+  # - -zap-log-level debug
+
+## Specify additional environment variables for the container.
+## See: https://kubernetes.io/docs/tasks/inject-data-application/define-environment-variable-container/
+##
+env:
+  ## The following environment variables are required for the Role Operator to
+  ## read the configration.
+  ##
+  - name: ROLE_OPERATOR_CONFIG
+    value: /etc/role-operator/config.yaml
+
+## Specify additional labels and annotations for the created Pods.
+##
+podAnnotations: {}
+podLabels: {}
+
+## Specifies whether a service account should be created.
+## See: https://kubernetes.io/docs/tasks/configure-pod-container/configure-service-account/
+##
+serviceAccount:
+  enabled: true
+  ## The name of the service account to use. If not set and create is true, a
+  ## name is generated using the fullname template
+  ##
+  name: ""
+
+## Specifies whether a cluster role and cluster role binding should be created.
+## See: https://kubernetes.io/docs/reference/access-authn-authz/rbac/
+##
+rbac:
+  enabled: true
+  ## The name of the cluster role and cluster role binding to use. If not set
+  ## and create is true, a name is generated using the fullname template.
+  ##
+  name:
+
+## Specifies the configuration for the Role Operator. The configuration is
+## passed to the Role Operator via a ConfigMap. The configuration is in YAML
+## format and can be used to specify the presets for the Role Operator.
+##
+config: |
+  presets: []
