@@ -28,7 +28,7 @@ type client struct {
 }
 
 func NewClient() (Client, error) {
-	var config *Config
+	config := &Config{}
 
 	if configFile := os.Getenv("ROLE_OPERATOR_CONFIG"); configFile != "" {
 		//nolint:gosec
@@ -37,7 +37,7 @@ func NewClient() (Client, error) {
 			return nil, err
 		}
 
-		err = yaml.Unmarshal(configContent, &config)
+		err = yaml.Unmarshal(configContent, config)
 		if err != nil {
 			return nil, err
 		}

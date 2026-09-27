@@ -78,3 +78,24 @@ func TestNewClientWithMissingConfigFile(t *testing.T) {
 		t.Fatal("expected an error for a missing config file, got nil")
 	}
 }
+
+func TestNewClientWithEmptyConfigFile(t *testing.T) {
+	for name, content := range map[string]string{"empty": "", "null": "null\n"} {
+		t.Run(name, func(t *testing.T) {
+			file := filepath.Join(t.TempDir(), "config.yaml")
+			if err := os.WriteFile(file, []byte(content), 0o600); err != nil {
+				t.Fatalf("failed to write config file: %v", err)
+			}
+
+			t.Setenv("ROLE_OPERATOR_CONFIG", file)
+
+			c, err := NewClient()
+			if err != nil {
+				t.Fatalf("NewClient returned an error: %v", err)
+			}
+			if p := c.GetPreset("anything"); p != nil {
+				t.Errorf("expected no preset for an empty config file, got %v", p)
+			}
+		})
+	}
+}
