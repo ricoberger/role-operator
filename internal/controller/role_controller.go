@@ -31,7 +31,8 @@ import (
 // RoleReconciler reconciles a Role object
 type RoleReconciler struct {
 	client.Client
-	Scheme *runtime.Scheme
+	Scheme       *runtime.Scheme
+	ConfigClient config.Client
 }
 
 // +kubebuilder:rbac:groups=ricoberger.de,resources=roles,verbs=get;list;watch;create;update;patch;delete
@@ -129,7 +130,7 @@ func (r *RoleReconciler) mergePreset(role *ricobergerdev1alpha1.Role) (*ricoberg
 		return role, nil
 	}
 
-	preset := config.GetPreset(role.Spec.Preset)
+	preset := r.ConfigClient.GetPreset(role.Spec.Preset)
 	if preset == nil {
 		return role, fmt.Errorf("preset %s not found", role.Spec.Preset)
 	}

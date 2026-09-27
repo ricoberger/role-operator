@@ -70,7 +70,8 @@ func main() {
 
 	ctrl.SetLogger(zap.New(zap.UseFlagOptions(&opts)))
 
-	if err := config.Init(); err != nil {
+	configClient, err := config.NewClient()
+	if err != nil {
 		setupLog.Error(err, "failed to initialize configuration")
 		os.Exit(1)
 	}
@@ -184,8 +185,9 @@ func main() {
 	}
 
 	if err := (&controller.RoleReconciler{
-		Client: mgr.GetClient(),
-		Scheme: mgr.GetScheme(),
+		Client:       mgr.GetClient(),
+		Scheme:       mgr.GetScheme(),
+		ConfigClient: configClient,
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "Role")
 		os.Exit(1)
