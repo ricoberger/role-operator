@@ -59,12 +59,20 @@ func (r *RoleReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.
 
 	// Resolve the preset referenced in the spec and merge its namespaces and
 	// rules into the effective Role. When the preset can not be found we fail
-	// closed: we do not modify any objects and we do not requeue, because a
-	// requeue can not fix a missing preset. All following logic operates on the
-	// merged Role.
+	// closed: we prune all managed objects, mirroring the empty subjects case,
+	// and we do not requeue, because a requeue can not fix a missing preset.
+	// All following logic operates on the merged Role.
 	role, err := r.mergePreset(role)
 	if err != nil {
 		log.Error(err, "failed to resolve preset")
+		if pruneErr := r.pruneAll(ctx, role); pruneErr != nil {
+			log.Error(pruneErr, "failed to reconcile Role")
+			if updateReadyConditionErr := r.updateReadyCondition(ctx, role, metav1.ConditionFalse, "ReconcileFailed", pruneErr.Error()); updateReadyConditionErr != nil {
+				log.Error(updateReadyConditionErr, "failed to update Ready condition")
+				return ctrl.Result{}, utilerrors.NewAggregate([]error{updateReadyConditionErr, pruneErr})
+			}
+			return ctrl.Result{}, pruneErr
+		}
 		if updateReadyConditionErr := r.updateReadyCondition(ctx, role, metav1.ConditionFalse, "PresetNotFound", err.Error()); updateReadyConditionErr != nil {
 			log.Error(updateReadyConditionErr, "failed to update Ready condition")
 			return ctrl.Result{}, updateReadyConditionErr
@@ -139,11 +147,18 @@ func (r *RoleReconciler) mergePreset(role *ricobergerdev1alpha1.Role) (*ricoberg
 func (r *RoleReconciler) reconcile(ctx context.Context, role *ricobergerdev1alpha1.Role) error {
 	var errs []error
 
-	if err := r.applyRoles(ctx, role); err != nil {
+	// Resolve the desired namespaces once, they are shared by applyRoles and
+	// applyRoleBindings.
+	namespaces, err := r.desiredNamespaces(ctx, role)
+	if err != nil {
 		errs = append(errs, err)
-	}
-	if err := r.applyRoleBindings(ctx, role); err != nil {
-		errs = append(errs, err)
+	} else {
+		if err := r.applyRoles(ctx, role, namespaces); err != nil {
+			errs = append(errs, err)
+		}
+		if err := r.applyRoleBindings(ctx, role, namespaces); err != nil {
+			errs = append(errs, err)
+		}
 	}
 	if err := r.applyClusterRole(ctx, role); err != nil {
 		errs = append(errs, err)
@@ -181,13 +196,9 @@ func (r *RoleReconciler) desiredNamespaces(ctx context.Context, role *ricoberger
 }
 
 // applyRoles creates or updates the Roles in all desired namespaces and prunes
-// Roles in namespaces which are no longer desired.
-func (r *RoleReconciler) applyRoles(ctx context.Context, role *ricobergerdev1alpha1.Role) error {
-	namespaces, err := r.desiredNamespaces(ctx, role)
-	if err != nil {
-		return err
-	}
-
+// Roles in namespaces which are no longer desired. The set of desired
+// namespaces is resolved by the caller.
+func (r *RoleReconciler) applyRoles(ctx context.Context, role *ricobergerdev1alpha1.Role, namespaces map[string]bool) error {
 	var errs []error
 	for namespace := range namespaces {
 		obj := &rbacv1.Role{
@@ -215,12 +226,8 @@ func (r *RoleReconciler) applyRoles(ctx context.Context, role *ricobergerdev1alp
 
 // applyRoleBindings creates or updates the RoleBindings in all desired
 // namespaces and prunes RoleBindings in namespaces which are no longer desired.
-func (r *RoleReconciler) applyRoleBindings(ctx context.Context, role *ricobergerdev1alpha1.Role) error {
-	namespaces, err := r.desiredNamespaces(ctx, role)
-	if err != nil {
-		return err
-	}
-
+// The set of desired namespaces is resolved by the caller.
+func (r *RoleReconciler) applyRoleBindings(ctx context.Context, role *ricobergerdev1alpha1.Role, namespaces map[string]bool) error {
 	var errs []error
 	for namespace := range namespaces {
 		obj := &rbacv1.RoleBinding{
@@ -444,7 +451,14 @@ func (r *RoleReconciler) mapNamespaceToRoles(ctx context.Context, obj client.Obj
 	var requests []reconcile.Request
 	for i := range roles.Items {
 		role := &roles.Items[i]
-		if slices.Contains(role.Spec.Namespaces, namespace) {
+		// Merge the preset so namespaces contributed by it are considered.
+		// When the preset can not be resolved the reconcile would fail closed
+		// anyway, so there is no point in enqueueing the Role.
+		merged, err := r.mergePreset(role)
+		if err != nil {
+			continue
+		}
+		if slices.Contains(merged.Spec.Namespaces, namespace) {
 			requests = append(requests, reconcile.Request{
 				NamespacedName: types.NamespacedName{Name: role.Name},
 			})
