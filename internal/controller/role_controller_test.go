@@ -16,6 +16,21 @@ import (
 	"github.com/ricoberger/role-operator/internal/config"
 )
 
+// fakeConfigClient is a config.Client implementation for tests, which returns
+// the configured presets without loading a configuration file.
+type fakeConfigClient struct {
+	presets []config.Preset
+}
+
+func (f *fakeConfigClient) GetPreset(preset string) *config.Preset {
+	for i := range f.presets {
+		if f.presets[i].Name == preset {
+			return &f.presets[i]
+		}
+	}
+	return nil
+}
+
 var _ = Describe("Role Controller", func() {
 	Context("when reconciling a resource", func() {
 		const resourceName = "test-resource"
@@ -26,6 +41,7 @@ var _ = Describe("Role Controller", func() {
 
 		typeNamespacedName := types.NamespacedName{Name: resourceName}
 		reconciler := &RoleReconciler{}
+		configClient := &fakeConfigClient{}
 
 		subjects := []rbacv1.Subject{{
 			Kind:     rbacv1.GroupKind,
@@ -44,15 +60,15 @@ var _ = Describe("Role Controller", func() {
 		}}
 
 		BeforeEach(func() {
+			configClient = &fakeConfigClient{}
 			reconciler = &RoleReconciler{
-				Client: k8sClient,
-				Scheme: k8sClient.Scheme(),
+				Client:       k8sClient,
+				Scheme:       k8sClient.Scheme(),
+				ConfigClient: configClient,
 			}
 		})
 
 		AfterEach(func() {
-			config.Reset()
-
 			resource := &ricobergerdev1alpha1.Role{}
 			if err := k8sClient.Get(ctx, typeNamespacedName, resource); err == nil {
 				Expect(k8sClient.Delete(ctx, resource)).To(Succeed())
@@ -230,12 +246,12 @@ var _ = Describe("Role Controller", func() {
 				Resources: []string{"namespaces"},
 				Verbs:     []string{"get", "list", "watch"},
 			}}
-			config.SetPresets([]config.Preset{{
+			configClient.presets = []config.Preset{{
 				Name:             "readonly",
 				Namespaces:       []string{presetNamespace},
 				RoleRules:        presetRoleRules,
 				ClusterRoleRules: presetClusterRoleRules,
-			}})
+			}}
 
 			createRole(ricobergerdev1alpha1.RoleSpec{
 				Preset:     "readonly",
@@ -300,11 +316,11 @@ var _ = Describe("Role Controller", func() {
 		})
 
 		It("should prune all managed objects when the preset is removed after a successful reconciliation", func() {
-			config.SetPresets([]config.Preset{{
+			configClient.presets = []config.Preset{{
 				Name:             "readonly",
 				Namespaces:       []string{presetNamespace},
 				ClusterRoleRules: clusterRoleRules,
-			}})
+			}}
 
 			createRole(ricobergerdev1alpha1.RoleSpec{
 				Preset:     "readonly",
@@ -321,7 +337,7 @@ var _ = Describe("Role Controller", func() {
 			Expect(k8sClient.Get(ctx, types.NamespacedName{Name: resourceName}, &rbacv1.ClusterRoleBinding{})).To(Succeed())
 
 			By("removing the preset from the operator configuration")
-			config.Reset()
+			configClient.presets = nil
 
 			result, err := reconcileOnce()
 			Expect(err).NotTo(HaveOccurred())

@@ -8,8 +8,6 @@ import (
 	"sigs.k8s.io/yaml"
 )
 
-var config *Config
-
 type Config struct {
 	Presets []Preset `json:"presets,omitempty"`
 }
@@ -21,46 +19,47 @@ type Preset struct {
 	ClusterRoleRules []rbacv1.PolicyRule `json:"clusterRoleRules,omitempty"`
 }
 
-func Init() error {
+type Client interface {
+	GetPreset(preset string) *Preset
+}
+
+type client struct {
+	config *Config
+}
+
+func NewClient() (Client, error) {
+	config := &Config{}
+
 	if configFile := os.Getenv("ROLE_OPERATOR_CONFIG"); configFile != "" {
 		//nolint:gosec
 		configContent, err := os.ReadFile(configFile)
 		if err != nil {
-			return err
+			return nil, err
 		}
 
-		err = yaml.Unmarshal(configContent, &config)
+		err = yaml.Unmarshal(configContent, config)
 		if err != nil {
-			return err
+			return nil, err
 		}
 
 		log.Log.Info("loaded configuration", "file", configFile, "presets", len(config.Presets))
 	}
 
-	return nil
+	return &client{
+		config: config,
+	}, nil
 }
 
-func GetPreset(preset string) *Preset {
-	if config == nil || len(config.Presets) == 0 {
+func (c *client) GetPreset(preset string) *Preset {
+	if c.config == nil || len(c.config.Presets) == 0 {
 		return nil
 	}
 
-	for _, p := range config.Presets {
+	for _, p := range c.config.Presets {
 		if p.Name == preset {
 			return &p
 		}
 	}
 
 	return nil
-}
-
-// SetPresets replaces the loaded configuration with the given presets. It is
-// intended for use in tests to inject presets without loading a file.
-func SetPresets(presets []Preset) {
-	config = &Config{Presets: presets}
-}
-
-// Reset clears the loaded configuration. It is intended for use in tests.
-func Reset() {
-	config = nil
 }
