@@ -298,5 +298,56 @@ var _ = Describe("Role Controller", func() {
 			Expect(cond.Status).To(Equal(metav1.ConditionFalse))
 			Expect(cond.Reason).To(Equal("PresetNotFound"))
 		})
+
+		It("should prune all managed objects when the preset is removed after a successful reconciliation", func() {
+			config.SetPresets([]config.Preset{{
+				Name:             "readonly",
+				Namespaces:       []string{presetNamespace},
+				ClusterRoleRules: clusterRoleRules,
+			}})
+
+			createRole(ricobergerdev1alpha1.RoleSpec{
+				Preset:     "readonly",
+				Subjects:   subjects,
+				Namespaces: []string{targetNamespace},
+				RoleRules:  roleRules,
+			})
+
+			_, err := reconcileOnce()
+			Expect(err).NotTo(HaveOccurred())
+			Expect(k8sClient.Get(ctx, types.NamespacedName{Name: resourceName, Namespace: targetNamespace}, &rbacv1.Role{})).To(Succeed())
+			Expect(k8sClient.Get(ctx, types.NamespacedName{Name: resourceName, Namespace: presetNamespace}, &rbacv1.Role{})).To(Succeed())
+			Expect(k8sClient.Get(ctx, types.NamespacedName{Name: resourceName}, &rbacv1.ClusterRole{})).To(Succeed())
+			Expect(k8sClient.Get(ctx, types.NamespacedName{Name: resourceName}, &rbacv1.ClusterRoleBinding{})).To(Succeed())
+
+			By("removing the preset from the operator configuration")
+			config.Reset()
+
+			result, err := reconcileOnce()
+			Expect(err).NotTo(HaveOccurred())
+			Expect(result).To(Equal(reconcile.Result{}))
+
+			By("pruning all managed objects")
+			err = k8sClient.Get(ctx, types.NamespacedName{Name: resourceName, Namespace: targetNamespace}, &rbacv1.Role{})
+			Expect(apierrors.IsNotFound(err)).To(BeTrue())
+			err = k8sClient.Get(ctx, types.NamespacedName{Name: resourceName, Namespace: targetNamespace}, &rbacv1.RoleBinding{})
+			Expect(apierrors.IsNotFound(err)).To(BeTrue())
+			err = k8sClient.Get(ctx, types.NamespacedName{Name: resourceName, Namespace: presetNamespace}, &rbacv1.Role{})
+			Expect(apierrors.IsNotFound(err)).To(BeTrue())
+			err = k8sClient.Get(ctx, types.NamespacedName{Name: resourceName, Namespace: presetNamespace}, &rbacv1.RoleBinding{})
+			Expect(apierrors.IsNotFound(err)).To(BeTrue())
+			err = k8sClient.Get(ctx, types.NamespacedName{Name: resourceName}, &rbacv1.ClusterRole{})
+			Expect(apierrors.IsNotFound(err)).To(BeTrue())
+			err = k8sClient.Get(ctx, types.NamespacedName{Name: resourceName}, &rbacv1.ClusterRoleBinding{})
+			Expect(apierrors.IsNotFound(err)).To(BeTrue())
+
+			By("setting the Ready condition to False with reason PresetNotFound")
+			updated := &ricobergerdev1alpha1.Role{}
+			Expect(k8sClient.Get(ctx, typeNamespacedName, updated)).To(Succeed())
+			cond := meta.FindStatusCondition(updated.Status.Conditions, "Ready")
+			Expect(cond).NotTo(BeNil())
+			Expect(cond.Status).To(Equal(metav1.ConditionFalse))
+			Expect(cond.Reason).To(Equal("PresetNotFound"))
+		})
 	})
 })
