@@ -12,7 +12,7 @@ COPY internal/ internal/
 
 RUN CGO_ENABLED=0 go build -a -o manager cmd/main.go
 
-FROM alpine:3.24.1
+FROM alpine:3.24.2
 WORKDIR /
 COPY --from=builder /workspace/manager .
 USER nobody
